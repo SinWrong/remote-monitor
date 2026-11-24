@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>远程画面监控</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #111214;
+    --panel: #1b1d20;
+    --panel-2: #23262a;
+    --line: #34383d;
+    --text: #e8eaed;
+    --muted: #9aa0a6;
+    --accent: #4c9aff;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px 20px 48px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card h2 { font-size: 14px; font-weight: 600; margin: 0 0 14px; }
+  label { display: block; color: var(--muted); font-size: 12px; margin: 12px 0 5px; }
+  input, select {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 9px 10px;
+    font: inherit;
+    outline: none;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  button {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font: inherit;
+    cursor: pointer;
+    background: var(--accent);
+    color: #08121f;
+    font-weight: 600;
+  }
+  button.secondary { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; margin-top: 16px; }
+  .row button { flex: 1; }
+  .status { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.online { background: var(--ok); }
+  .dot.connecting { background: var(--warn); }
+  .dot.offline { background: var(--bad); }
+  .stage {
+    position: relative;
+    background: #08090a;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    min-height: 420px;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #frame { display: none; width: 100%; height: 100%; object-fit: contain; }
+  #placeholder { color: var(--muted); text-align: center; padding: 20px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+  @media (max-width: 620px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat { background: var(--panel-2); border-radius: 8px; padding: 10px; }
+  .stat .k { color: var(--muted); font-size: 11px; }
+  .stat .v { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 12px; }
+  .divider { height: 1px; background: var(--line); margin: 16px 0; }
+  code { background: var(--panel-2); padding: 2px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>远程画面监控</h1>
+    <span class="sub">仅在已获授权的设备上使用 · 画面不落盘</span>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="card">
+        <div class="status">
+          <span id="dot" class="dot offline"></span>
+          <span id="statusText">未连接</span>
+          <span id="agentState" class="sub" style="margin-left:auto"></span>
+        </div>
+        <div class="stage">
+          <img id="frame" alt="远程屏幕画面">
+          <div id="placeholder">连接后将在这里显示实时画面</div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">接收帧率</div><div class="v" id="fpsValue">0.0</div></div>
+          <div class="stat"><div class="k">画面延迟</div><div class="v" id="latencyValue">--</div></div>
+          <div class="stat"><div class="k">分辨率</div><div class="v" id="sizeValue">--</div></div>
+          <div class="stat"><div class="k">已收帧数</div><div class="v" id="countValue">0</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>连接</h2>
+        <label for="serverInput">服务地址</label>
+        <input id="serverInput" placeholder="留空则使用当前站点" autocomplete="off">
+        <label for="tokenInput">访问令牌</label>
+        <input id="tokenInput" type="password" autocomplete="off">
+        <label for="agentSelect">在线设备</label>
+        <select id="agentSelect"><option value="default">default</option></select>
+        <label for="agentIdInput">设备 ID</label>
+        <input id="agentIdInput" value="default" autocomplete="off">
+        <div class="row">
+          <button id="connectBtn">连接</button>
+          <button id="disconnectBtn" class="secondary" disabled>断开</button>
+        </div>
+        <div class="hint">公网访问请使用 HTTPS 页面，连接会自动升级为 WSS 加密通道。</div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h2>采集参数</h2>
+        <label for="fpsSlider">帧率：<span id="fpsLabel">10</span> fps</label>
+        <input id="fpsSlider" type="range" min="1" max="30" value="10">
+        <label for="qualitySlider">JPEG 质量：<span id="qualityLabel">65</span></label>
+        <input id="qualitySlider" type="range" min="20" max="95" value="65">
+        <label for="widthSelect">最大宽度</label>
+        <select id="widthSelect">
+          <option value="640">640 px（省流量）</option>
+          <option value="960">960 px</option>
+          <option value="1280" selected>1280 px（推荐）</option>
+          <option value="1920">1920 px（高清）</option>
+        </select>
+        <div class="row">
+          <button id="applyBtn" class="secondary" disabled>应用到采集端</button>
+        </div>
+        <div class="divider"></div>
+        <div class="hint">带宽紧张时，优先降低帧率，其次是最大宽度。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    server: $('serverInput'), token: $('tokenInput'), agentSelect: $('agentSelect'),
+    agentId: $('agentIdInput'), connect: $('connectBtn'), disconnect: $('disconnectBtn'),
+    dot: $('dot'), statusText: $('statusText'), agentState: $('agentState'),
+    frame: $('frame'), placeholder: $('placeholder'),
+    fps: $('fpsValue'), latency: $('latencyValue'), size: $('sizeValue'), count: $('countValue'),
+    fpsSlider: $('fpsSlider'), fpsLabel: $('fpsLabel'),
+    qualitySlider: $('qualitySlider'), qualityLabel: $('qualityLabel'),
+    widthSelect: $('widthSelect'), apply: $('applyBtn')
+  };
+
+  let socket = null;
+  let shouldReconnect = false;
+  let pendingFrame = null;
+  let frameScheduled = false;
+  let received = 0;
+  let recentFrames = [];
+  let selectedAgent = 'default';
+
+  const params = new URLSearchParams(location.search);
+  els.server.value = params.get('server') || '';
+  els.token.value = sessionStorage.getItem('monitorToken') || params.get('token') || '';
+  els.agentId.value = params.get('agent') || 'default';
+
+  function setStatus(text, className) {
+    els.statusText.textContent = text;
+    els.dot.className = 'dot ' + className;
+  }
+
+  function wsUrl() {
+    let host = els.server.value.trim().replace(/\/+$/, '');
+    if (!host) host = location.host;
+    host = host.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://');
+    if (!/^wss?:\/\//.test(host)) host = (location.protocol === 'https:' ? 'wss://' : 'ws://') + host;
+    const query = new URLSearchParams({
+      token: els.token.value.trim(),
+      agent_id: els.agentId.value.trim() || 'default'
+    });
+    return host + '/ws/viewer?' + query.toString();
+  }
+
+  function scheduleFrame() {
+    if (frameScheduled || !pendingFrame) return;
+    frameScheduled = true;
+    requestAnimationFrame(() => {
+      frameScheduled = false;
+      const data = pendingFrame;
+      pendingFrame = null;
+      els.frame.src = 'data:image/jpeg;base64,' + data.data;
+      els.frame.style.display = 'block';
+      els.placeholder.style.display = 'none';
+      els.size.textContent = data.w + '×' + data.h;
+      const age = Date.now() - data.ts;
+      els.latency.textContent = (age >= 0 ? age : 0) + ' ms';
+    });
+  }
+
+  function updateFpsCounter() {
+    const now = Date.now();
+    recentFrames = recentFrames.filter((t) => now - t < 2000);
+    els.fps.textContent = (recentFrames.length / 2).toFixed(1);
+  }
+  setInterval(updateFpsCounter, 500);
+
+  function updateAgentList(agents) {
+    const previous = els.agentSelect.value;
+    els.agentSelect.innerHTML = '';
+    if (!agents.length) {
+      const option = document.createElement('option');
+      option.value = selectedAgent;
+      option.textContent = selectedAgent + '（未在线）';
+      els.agentSelect.appendChild(option);
+      els.agentState.textContent = '无在线采集端';
+      return;
+    }
+    agents.forEach((agent) => {
+      const option = document.createElement('option');
+      option.value = agent.agent_id;
+      option.textContent = (agent.name || agent.agent_id) + (agent.online ? ' · 在线' : '');
+      els.agentSelect.appendChild(option);
+    });
+    const target = agents.some((a) => a.agent_id === previous) ? previous : agents[0].agent_id;
+    els.agentSelect.value = target;
+    selectedAgent = target;
+    els.agentId.value = target;
+    els.agentState.textContent = agents.length + ' 台设备在线';
+  }
+
+  function connect() {
+    if (!els.token.value.trim()) {
+      setStatus('请先填写访问令牌', 'offline');
+      return;
+    }
+    shouldReconnect = true;
+    sessionStorage.setItem('monitorToken', els.token.value.trim());
+    openSocket();
+  }
+
+  function openSocket() {
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+    setStatus('正在连接…', 'connecting');
+    let ws;
+    try {
+      ws = new WebSocket(wsUrl());
+    } catch (error) {
+      setStatus('地址格式有误', 'offline');
+      return;
+    }
+    socket = ws;
+    els.connect.disabled = true;
+
+    ws.onopen = () => {
+      setStatus('已连接，等待画面', 'online');
+      els.disconnect.disabled = false;
+      els.apply.disabled = false;
+    };
+    ws.onmessage = (event) => {
+      let message;
+      try { message = JSON.parse(event.data); } catch (error) { return; }
+      if (message.type === 'frame') {
+        pendingFrame = message;
+        received++;
+        recentFrames.push(Date.now());
+        els.count.textContent = received;
+        scheduleFrame();
+      } else if (message.type === 'agent_list') {
+        updateAgentList(message.agents || []);
+      } else if (message.type === 'notice') {
+        setStatus(message.text, 'connecting');
+      }
+    };
+    ws.onerror = () => setStatus('连接失败，请检查地址与令牌', 'offline');
+    ws.onclose = (event) => {
+      els.connect.disabled = false;
+      els.disconnect.disabled = true;
+      els.apply.disabled = true;
+      if (event.code === 4401) {
+        shouldReconnect = false;
+        setStatus('令牌无效', 'offline');
+        return;
+      }
+      setStatus('连接已断开', 'offline');
+      if (shouldReconnect) setTimeout(openSocket, 3000);
+    };
+  }
+
+  function disconnect() {
+    shouldReconnect = false;
+    if (socket) socket.close();
+    socket = null;
+    setStatus('已手动断开', 'offline');
+    els.connect.disabled = false;
+    els.disconnect.disabled = true;
+    els.apply.disabled = true;
+  }
+
+  els.connect.addEventListener('click', connect);
+  els.disconnect.addEventListener('click', disconnect);
+  els.agentSelect.addEventListener('change', () => {
+    selectedAgent = els.agentSelect.value;
+    els.agentId.value = selectedAgent;
+  });
+  els.fpsSlider.addEventListener('input', () => els.fpsLabel.textContent = els.fpsSlider.value);
+  els.qualitySlider.addEventListener('input', () => els.qualityLabel.textContent = els.qualitySlider.value);
+  els.apply.addEventListener('click', () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({
+      type: 'config',
+      fps: Number(els.fpsSlider.value),
+      quality: Number(els.qualitySlider.value),
+      max_width: Number(els.widthSelect.value)
+    }));
+  });
+
+  if (els.token.value) connect();
+})();
+</script>
+</body>
+</html>

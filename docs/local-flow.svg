@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 170" width="100%" role="img">
+<title>本机自测数据流</title>
+<desc>在同一台电脑上，采集端、中转服务和浏览器通过 127.0.0.1 形成闭环。</desc>
+<text x="40" y="30" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="16" font-weight="600" fill="#1f2328">本地自测闭环</text>
+<rect x="40" y="52" width="180" height="52" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
+<text x="130" y="72" text-anchor="middle" dominant-baseline="central" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#042C53">浏览器观看端</text>
+<text x="130" y="90" text-anchor="middle" dominant-baseline="central" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="11" fill="#185FA5">127.0.0.1:8000</text>
+<rect x="250" y="52" width="180" height="52" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
+<text x="340" y="72" text-anchor="middle" dominant-baseline="central" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#04342C">中转服务</text>
+<text x="340" y="90" text-anchor="middle" dominant-baseline="central" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="11" fill="#0F6E56">FastAPI + WebSocket</text>
+<rect x="460" y="52" width="180" height="52" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
+<text x="550" y="72" text-anchor="middle" dominant-baseline="central" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="13" font-weight="600" fill="#042C53">屏幕采集端</text>
+<text x="550" y="90" text-anchor="middle" dominant-baseline="central" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="11" fill="#185FA5">mss + Pillow</text>
+<defs>
+<marker id="b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+<path d="M224 78H244" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#b)"/>
+<path d="M434 78H454" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#b)"/>
+<text x="40" y="138" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="12" fill="#57606a">一条命令启动全部：`python run_local_test.py`，按 Ctrl+C 停止。</text>
+</svg>
